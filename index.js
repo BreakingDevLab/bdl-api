@@ -65,3 +65,68 @@ app.delete('/api/quotes/:id', (req, res) => {
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
+// --- quote email route (inserted by script) ---
+const nodemailer = require('nodemailer');
+
+function createTransporter() {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) {
+    console.warn('SMTP not configured. Email sending will be skipped until SMTP_HOST/SMTP_USER/SMTP_PASS are set.');
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass }
+  });
+}
+
+// ensure urlencoded bodies are parsed for HTML form posts
+app.use(express.urlencoded({ extended: true }));
+
+app.post('/api/quote', async (req, res) => {
+  try {
+    const { name, email, phone, details } = req.body || {};
+
+    if (!name || !details) {
+      return res.status(400).json({ error: 'name and details are required' });
+    }
+
+    const to = process.env.EMAIL_TO || 'www.thapza@gmail.com';
+    const subject = `New quote request from ${name}`;
+    const text = [
+      `Name: ${name}`,
+      `Email: ${email || 'N/A'}`,
+      `Phone: ${phone || 'N/A'}`,
+      '',
+      'Request details:',
+      details
+    ].join('\\n');
+
+    const transporter = createTransporter();
+    if (!transporter) {
+      console.error('No SMTP transporter configured. Skipping email send.');
+      return res.status(200).json({ status: 'ok', message: 'Quote received (email not sent, SMTP not configured).' });
+    }
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      to,
+      subject,
+      text
+    });
+
+    const newQuote = { id: Date.now(), name, email, phone, details };
+    res.status(201).json({ status: 'ok', message: 'Quote request received and emailed.', quote: newQuote });
+  } catch (err) {
+    console.error('Error sending quote email:', err);
+    res.status(500).json({ error: 'Failed to process quote request' });
+  }
+});
+// --- end inserted code ---
