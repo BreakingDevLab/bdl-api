@@ -120,7 +120,8 @@ app.post('/api/quote', async (req, res) => {
 
 
     const newQuote = { id: Date.now(), name, email, phone, details };
-    } catch (err) {
+    res.status(201).json({ status: 'ok', message: 'Quote request received and emailed.', quote: newQuote });
+  } catch (err) {
     console.error('Error sending quote email:', err);
     res.status(500).json({ error: 'Failed to process quote request' });
   }

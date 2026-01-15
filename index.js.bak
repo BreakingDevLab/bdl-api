@@ -1,4 +1,3 @@
-const sendQuoteEmailVerbose = require('./verbose-email.js');
 const express = require('express');
 const cors = require('cors');
 
@@ -116,11 +115,16 @@ app.post('/api/quote', async (req, res) => {
       return res.status(200).json({ status: 'ok', message: 'Quote received (email not sent, SMTP not configured).' });
     }
 
-    await await sendQuoteEmailVerbose(transporter, { name, email, phone, details }, res);
-
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      to,
+      subject,
+      text
+    });
 
     const newQuote = { id: Date.now(), name, email, phone, details };
-    } catch (err) {
+    res.status(201).json({ status: 'ok', message: 'Quote request received and emailed.', quote: newQuote });
+  } catch (err) {
     console.error('Error sending quote email:', err);
     res.status(500).json({ error: 'Failed to process quote request' });
   }
