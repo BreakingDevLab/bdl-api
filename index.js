@@ -1,4 +1,6 @@
+const { sendViaBrevo } = require('./brevo-send');
 const sendQuoteEmailVerbose = require('./verbose-email.js');
+const { sendViaBrevo } = require('./brevo-send');
 const express = require('express');
 const cors = require('cors');
 
@@ -116,7 +118,26 @@ app.post('/api/quote', async (req, res) => {
       return res.status(200).json({ status: 'ok', message: 'Quote received (email not sent, SMTP not configured).' });
     }
 
-    await await sendQuoteEmailVerbose(transporter, { name, email, phone, details }, res);
+const subject = `New quote request from ${name}`;
+const htmlContent = `<h3>New quote request</h3>
+  <p><strong>Name:</strong> ${name}</p>
+  <p><strong>Email:</strong> ${email || 'N/A'}</p>
+  <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
+  <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
+
+try {
+  await sendViaBrevo({
+    toEmail: process.env.EMAIL_TO,
+    subject,
+    htmlContent,
+    senderEmail: process.env.EMAIL_FROM,
+    senderName: 'BDL'
+  });
+  console.log('Quote email sent via Brevo HTTP API');
+} catch (err) {
+  console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err));
+  throw err;
+}
 
 
     const newQuote = { id: Date.now(), name, email, phone, details };
