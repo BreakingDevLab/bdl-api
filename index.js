@@ -126,7 +126,6 @@ app.post('/api/quote', async (req, res) => {
   }
 });
 // --- end inserted code ---
-const sgMail = require('@sendgrid/mail');
 
 function sendQuoteEmailSG({ to, from, subject, text }) {
   const key = process.env.SENDGRID_API_KEY;
