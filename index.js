@@ -1,3 +1,4 @@
+const sendQuoteEmailVerbose = require('./verbose-email.js');
 const express = require('express');
 const cors = require('cors');
 
@@ -115,18 +116,26 @@ app.post('/api/quote', async (req, res) => {
       return res.status(200).json({ status: 'ok', message: 'Quote received (email not sent, SMTP not configured).' });
     }
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
-      to,
-      subject,
-      text
-    });
+    await await sendQuoteEmailVerbose(transporter, { name, email, phone, details }, res);
+
 
     const newQuote = { id: Date.now(), name, email, phone, details };
-    res.status(201).json({ status: 'ok', message: 'Quote request received and emailed.', quote: newQuote });
-  } catch (err) {
+    } catch (err) {
     console.error('Error sending quote email:', err);
     res.status(500).json({ error: 'Failed to process quote request' });
   }
 });
 // --- end inserted code ---
+const sgMail = require('@sendgrid/mail');
+
+function sendQuoteEmailSG({ to, from, subject, text }) {
+  const key = process.env.SENDGRID_API_KEY;
+  if (!key) {
+    console.warn('SENDGRID_API_KEY not set; skipping SendGrid send.');
+    return Promise.resolve({ skipped: true });
+  }
+  sgMail.setApiKey(key);
+  return sgMail.send({ to, from, subject, text });
+}
+
+module.exports = { sendQuoteEmailSG };
