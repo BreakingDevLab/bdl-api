@@ -1,5 +1,4 @@
 const { sendViaBrevo } = require("./brevo-send");
-const { sendViaBrevo } = require(\x27./brevo-send\x27);
 const sendQuoteEmailVerbose = require('./verbose-email.js');
 const express = require('express');
 const cors = require('cors');
@@ -113,10 +112,8 @@ app.post('/api/quote', async (req, res) => {
     ].join('\\n');
 
     const transporter = createTransporter();
-    if (!transporter) {
-      console.error('No SMTP transporter configured. Skipping email send.');
-      return res.status(200).json({ status: 'ok', message: 'Quote received (email not sent, SMTP not configured).' });
-    }
+const transporter = createTransporter();
+if (!transporter) { console.warn("No SMTP transporter configured; will still send via Brevo if BREVO_API_KEY is set."); }
 
 const subject = `New quote request from ${name}`;
 const htmlContent = `<h3>New quote request</h3>
@@ -126,15 +123,24 @@ const htmlContent = `<h3>New quote request</h3>
   <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
 
 try {
-  await sendViaBrevo({
-    toEmail: process.env.EMAIL_TO,
-    subject,
-    htmlContent,
-    senderEmail: process.env.EMAIL_FROM,
-    senderName: 'BDL'
-  });
-  console.log('Quote email sent via Brevo HTTP API');
+  if (!process.env.BREVO_API_KEY) {
+    console.warn('BREVO_API_KEY not set; skipping Brevo send.');
+  } else {
+    await sendViaBrevo({
+      toEmail: process.env.EMAIL_TO || process.env.EMAIL_FROM,
+      subject,
+      htmlContent,
+      senderEmail: process.env.EMAIL_FROM,
+      senderName: 'BDL'
+    });
+    console.log('Quote email sent via Brevo HTTP API');
+  }
 } catch (err) {
+  console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err));
+  // do not rethrow here; allow the handler to continue and respond
+}
+
+if (!transporter) { console.warn("No SMTP transporter configured; will still send via Brevo if BREVO_API_KEY is set."); }
   console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err));
   throw err;
 }
