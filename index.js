@@ -111,11 +111,52 @@ app.post('/api/quote', async (req, res) => {
       details
     ].join('\\n');
 
-    const transporter = createTransporter();
-const transporter = createTransporter();
+transporter = createTransporter();
+let transporter = transporter || createTransporter();
 if (!transporter) { console.warn("No SMTP transporter configured; will still send via Brevo if BREVO_API_KEY is set."); }
 
-const subject = `New quote request from ${name}`;
+// Promise timeout helper (10s)
+function promiseWithTimeout(promise, ms, errMsg = 'Operation timed out') {
+  let timeout;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(errMsg)), ms);
+  });
+  return Promise.race([promise.finally(() => clearTimeout(timeout)), timeoutPromise]);
+}
+
+let subject = `New quote request from ${name}`;
+let htmlContent = `<h3>New quote request</h3>
+  <p><strong>Name:</strong> ${name}</p>
+  <p><strong>Email:</strong> ${email || 'N/A'}</p>
+  <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
+  <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
+
+try {
+  if (!process.env.BREVO_API_KEY) {
+    console.warn('BREVO_API_KEY not set; skipping Brevo send.');
+  } else {
+    await promiseWithTimeout(
+      sendViaBrevo({
+        toEmail: process.env.EMAIL_TO || process.env.EMAIL_FROM,
+        subject,
+        htmlContent,
+        senderEmail: process.env.EMAIL_FROM,
+        senderName: 'BDL'
+      }),
+      10000,
+      'Brevo send timed out'
+    );
+    console.log('Quote email sent via Brevo HTTP API');
+  }
+} catch (err) {
+  console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err));
+  // do not rethrow so the endpoint can still respond
+}
+
+transporter = createTransporter();
+if (!transporter) { console.warn("No SMTP transporter configured; will still send via Brevo if BREVO_API_KEY is set."); }
+
+subject = `New quote request from ${name}`;
 const htmlContent = `<h3>New quote request</h3>
   <p><strong>Name:</strong> ${name}</p>
   <p><strong>Email:</strong> ${email || 'N/A'}</p>
@@ -146,6 +187,7 @@ if (!transporter) { console.warn("No SMTP transporter configured; will still sen
 }
 
 
+    const newQuote = { id: Date.now(), name, email, phone, details };
     const newQuote = { id: Date.now(), name, email, phone, details };
     } catch (err) {
     console.error('Error sending quote email:', err);
