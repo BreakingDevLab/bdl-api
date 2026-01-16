@@ -1,6 +1,6 @@
-const { sendViaBrevo } = require('./brevo-send');
+const { sendViaBrevo } = require("./brevo-send");
+const { sendViaBrevo } = require(\x27./brevo-send\x27);
 const sendQuoteEmailVerbose = require('./verbose-email.js');
-const { sendViaBrevo } = require('./brevo-send');
 const express = require('express');
 const cors = require('cors');
 
@@ -147,16 +147,9 @@ try {
   }
 });
 // --- end inserted code ---
+/* --- end inserted code --- */
 
-function sendQuoteEmailSG({ to, from, subject, text }) {
-  const key = process.env.SENDGRID_API_KEY;
-  if (!key) {
-    console.warn('SENDGRID_API_KEY not set; skipping SendGrid send.');
-    return Promise.resolve({ skipped: true });
-  }
-    return }
-
-module.exports = { sendQuoteEmailSG };
+module.exports = {};
 
 /* --- SMTP connectivity check (auto-logs on startup) --- */
 const dns = require('dns');
