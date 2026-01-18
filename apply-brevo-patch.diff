@@ -1,0 +1,31 @@
+*** Begin Patch
+*** Update File: index.js
+@@
+-// (existing nodemailer send block or call to transporter.sendMail)
+-// Replace the actual block below with your current send call location.
+-// Example placeholder:
+-// await transporter.sendMail(mailOptions);
++const { sendViaBrevo } = require('./brevo-send');
++
++// Build subject and HTML body for Brevo
++const subject = `New quote request from ${name}`;
++const htmlContent = `<h3>New quote request</h3>
++  <p><strong>Name:</strong> ${name}</p>
++  <p><strong>Email:</strong> ${email || 'N/A'}</p>
++  <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
++  <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
++
++try {
++  await sendViaBrevo({
++    toEmail: process.env.EMAIL_TO,
++    subject,
++    htmlContent,
++    senderEmail: process.env.EMAIL_FROM,
++    senderName: 'BDL'
++  });
++  console.log('Quote email sent via Brevo HTTP API');
++} catch (err) {
++  console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err));
++  throw err;
++}
+*** End Patch

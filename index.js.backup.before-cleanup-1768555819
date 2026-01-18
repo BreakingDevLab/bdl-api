@@ -111,7 +111,7 @@ app.post('/api/quote', async (req, res) => {
       details
     ].join('\\n');
 
-let transporter = createTransporter();
+transporter = createTransporter();
 let transporter = transporter || createTransporter();
 if (!transporter) { console.warn("No SMTP transporter configured; will still send via Brevo if BREVO_API_KEY is set."); }
 
