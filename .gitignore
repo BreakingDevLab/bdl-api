@@ -4,3 +4,4 @@ node_modules/
 .env
 *.bak
 *.backup.*
+send-test.js
