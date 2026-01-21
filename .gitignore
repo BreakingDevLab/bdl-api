@@ -5,3 +5,5 @@ node_modules/
 *.bak
 *.backup.*
 send-test.js
+/*.backup
+/index.js.pre-*
