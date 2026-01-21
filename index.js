@@ -22,64 +22,6 @@ function promiseWithTimeout(promise, ms, errMsg = 'Operation timed out') {
 // CORS
 const raw = process.env.CORS_ORIGINS || '';
 const allowedOrigins = raw.split(',').map(s => s.trim()).filter(Boolean);
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'));
-  }
-}));
-
-let quotes = [
-  { id: 1, text: "The only limit to our realization of tomorrow is our doubts of today.", author: "F. D. Roosevelt" },
-  { id: 2, text: "Do not wait to strike till the iron is hot; but make it hot by striking.", author: "William Butler Yeats" }
-];
-
-app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
-app.get('/api/quotes', (req, res) => res.json(quotes));
-app.get('/api/quotes/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const q = quotes.find(x => x.id === id);
-  if (!q) return res.status(404).json({ error: 'Quote not found' });
-  res.json(q);
-});
-app.post('/api/quotes', (req, res) => {
-  const { text, author } = req.body;
-  if (!text) return res.status(400).json({ error: 'text is required' });
-  const newQuote = { id: Date.now(), text, author: author || 'Unknown' };
-  quotes.push(newQuote);
-  res.status(201).json(newQuote);
-});
-app.put('/api/quotes/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const idx = quotes.findIndex(x => x.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'Quote not found' });
-  const { text, author } = req.body;
-  quotes[idx] = { ...quotes[idx], text: text || quotes[idx].text, author: author || quotes[idx].author };
-  res.json(quotes[idx]);
-});
-app.delete('/api/quotes/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const before = quotes.length;
-  quotes = quotes.filter(x => x.id !== id);
-  if (quotes.length === before) return res.status(404).json({ error: 'Quote not found' });
-  res.status(204).send();
-});
-
-function createTransporter() {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!host || !user || !pass) {
-    console.warn('SMTP not configured. Email sending will be skipped until SMTP_HOST/SMTP_USER/SMTP_PASS are set.');
-    return null;
-  }
-  return nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
-}
-
-app.use(express.urlencoded({ extended: true }));
-
 app.post('/api/quote', async (req, res) => {
   try {
     const { name, email, phone, details } = req.body || {};
@@ -93,17 +35,53 @@ app.post('/api/quote', async (req, res) => {
       '',
       'Request details:',
       details
-    ].join('\\n');
-
-    let transporter = createTransporter();
-    if (!transporter) console.warn('No SMTP transporter configured; will still attempt Brevo if BREVO_API_KEY is set.');
+    ].join('\n');
 
     const subject = `New quote request from ${name}`;
     const htmlContent = `<h3>New quote request</h3>
   <p><strong>Name:</strong> ${name}</p>
   <p><strong>Email:</strong> ${email || 'N/A'}</p>
   <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
-  <h4>Details</h4><p>${(details || '').replace(/\\n/g, '<br>')}</p>`;
+  <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
+
+    // Build transporter but do not block response on it
+    const transporter = createTransporter();
+    if (!transporter) console.warn('No SMTP transporter configured; will still attempt Brevo if BREVO_API_KEY is set.');
+
+    // Respond immediately to the client
+    const newQuote = { id: Date.now(), name, email, phone, details };
+    quotes.push(newQuote);
+    res.status(201).json({ status: 'ok', quote: newQuote });
+
+    // Fire-and-forget: Brevo send (with timeout wrapper)
+    if (process.env.BREVO_API_KEY) {
+      promiseWithTimeout(sendViaBrevo({
+        toEmail: to,
+        subject,
+        htmlContent,
+        senderEmail: process.env.EMAIL_FROM,
+        senderName: 'BDL'
+      }), 10000, 'Brevo send timed out')
+        .then(() => console.log('Quote email sent via Brevo HTTP API'))
+        .catch(err => console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err)));
+    } else {
+      console.warn('BREVO_API_KEY not set; skipping Brevo send.');
+    }
+
+    // Fire-and-forget: SMTP send
+    if (transporter) {
+      transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, text })
+        .then(() => console.log('Quote email sent via SMTP transporter'))
+        .catch(err => console.error('Error sending quote email via SMTP transporter:', err && err.message));
+    }
+
+  } catch (err) {
+    console.error('Error processing quote request:', err && (err.stack || err.message || err));
+    // If response not yet sent, return 500
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to process quote request' });
+  }
+});
+
 
     try {
       if (process.env.BREVO_API_KEY) {
