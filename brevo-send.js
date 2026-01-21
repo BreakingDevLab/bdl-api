@@ -1,4 +1,4 @@
-/* brevo-send.js - safe Brevo (Sendinblue) HTTP sender with guards */
+/* brevo-send.js - safe Brevo (Sendinblue) HTTP sender with SDK guard and HTTP fallback */
 let SibApiV3Sdk = null;
 try {
   const mod = require('@sendinblue/client');
@@ -10,37 +10,58 @@ try {
 
 /**
  * sendViaBrevo({ toEmail, subject, htmlContent, senderName, senderEmail })
- * Returns a Promise that resolves with the API response or rejects with an Error.
- * Fails fast with clear messages if the SDK or API key is missing.
+ * Tries SDK path first, falls back to direct HTTP POST to Sendinblue API.
  */
-function sendViaBrevo({ toEmail, subject, htmlContent, senderName, senderEmail }) {
+async function sendViaBrevo({ toEmail, subject, htmlContent, senderName, senderEmail }) {
   return new Promise(async (resolve, reject) => {
-    if (!SibApiV3Sdk) return reject(new Error('Brevo HTTP client not available. Skipping Brevo send.'));
     const apiKey = process.env.BREVO_API_KEY;
     if (!apiKey) return reject(new Error('BREVO_API_KEY not set. Skipping Brevo send.'));
 
+    // Try SDK path if available and shaped as expected
     try {
-      const defaultClient = SibApiV3Sdk.ApiClient && SibApiV3Sdk.ApiClient.instance;
-      const Api = SibApiV3Sdk.TransactionalEmailsApi;
-      if (!defaultClient || !Api) return reject(new Error('Brevo client shape unexpected.'));
+      if (SibApiV3Sdk && SibApiV3Sdk.ApiClient && SibApiV3Sdk.TransactionalEmailsApi) {
+        const defaultClient = SibApiV3Sdk.ApiClient.instance;
+        defaultClient.authentications['api-key'].apiKey = apiKey;
+        const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+        const sendSmtpEmail = {
+          to: [{ email: toEmail }],
+          sender: { name: senderName || 'BDL', email: senderEmail || process.env.EMAIL_FROM },
+          subject,
+          htmlContent
+        };
+        const resp = await apiInstance.sendTransacEmail(sendSmtpEmail);
+        return resolve(resp);
+      }
+    } catch (sdkErr) {
+      console.warn('Brevo SDK path failed, falling back to HTTP send:', sdkErr && (sdkErr.message || sdkErr));
+    }
 
-      // Configure API key
-      defaultClient.authentications['api-key'].apiKey = apiKey;
-
-      const apiInstance = new Api();
-      const sendSmtpEmail = {
-        to: [{ email: toEmail }],
+    // HTTP fallback using global fetch (Node 18+)
+    try {
+      const url = 'https://api.sendinblue.com/v3/smtp/email';
+      const body = {
         sender: { name: senderName || 'BDL', email: senderEmail || process.env.EMAIL_FROM },
+        to: [{ email: toEmail }],
         subject,
         htmlContent
       };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': apiKey
+        },
+        body: JSON.stringify(body)
+      });
 
-      const response = await apiInstance.sendTransacEmail(sendSmtpEmail);
-      resolve(response);
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        return reject(new Error(`Brevo HTTP error ${res.status}: ${text || res.statusText}`));
+      }
+      const json = await res.json().catch(() => ({}));
+      return resolve(json);
     } catch (err) {
-      // Normalize error message
-      const msg = err && (err.message || (err.body && JSON.stringify(err.body)) || err);
-      reject(new Error(msg || 'Unknown error from Brevo client'));
+      return reject(new Error(err && (err.message || err)));
     }
   });
 }
