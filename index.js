@@ -1,4 +1,4 @@
-const { sendViaBrevoHttp } = require(\x27./sendEmail\x27);\n/* Cleaned index.js: single Brevo require, fixed /api/quote handler, timeout wrapper */
+const { sendViaBrevoHttp } = require('./sendEmail');
 const { sendViaBrevo } = require('./brevo-send');
 const sendQuoteEmailVerbose = require('./verbose-email.js');
 const express = require('express');
