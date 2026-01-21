@@ -1,4 +1,4 @@
-const { sendViaBrevoHttp } = require('./sendEmail');
+/* Cleaned index.js: single Brevo require, fixed /api/quote handler, timeout wrapper */
 const { sendViaBrevo } = require('./brevo-send');
 const sendQuoteEmailVerbose = require('./verbose-email.js');
 const express = require('express');
@@ -177,50 +177,49 @@ app.post('/api/quote', async (req, res) => {
       '',
       'Request details:',
       details
-    ].join('\\n');
-
-    let transporter = createTransporter();
-    if (!transporter) console.warn('No SMTP transporter configured; will still attempt Brevo if BREVO_API_KEY is set.');
+    ].join('\n');
 
     const subject = `New quote request from ${name}`;
     const htmlContent = `<h3>New quote request</h3>
   <p><strong>Name:</strong> ${name}</p>
   <p><strong>Email:</strong> ${email || 'N/A'}</p>
   <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
-  <h4>Details</h4><p>${(details || '').replace(/\\n/g, '<br>')}</p>`;
+  <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
 
-    try {
-      if (process.env.BREVO_API_KEY) {
-        await promiseWithTimeout(sendViaBrevo({
-          toEmail: to,
-          subject,
-          htmlContent,
-          senderEmail: process.env.EMAIL_FROM,
-          senderName: 'BDL'
-        }), 10000, 'Brevo send timed out');
-        console.log('Quote email sent via Brevo HTTP API');
-      } else {
-        console.warn('BREVO_API_KEY not set; skipping Brevo send.');
-      }
-    } catch (err) {
-      console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err));
-    }
+    // Build transporter (may be null) but do not block the response on it
+    const transporter = createTransporter();
+    if (!transporter) console.warn('No SMTP transporter configured; will still attempt Brevo if BREVO_API_KEY is set.');
 
-    if (transporter) {
-      try {
-        await transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, text });
-        console.log('Quote email sent via SMTP transporter');
-      } catch (err) {
-        console.error('Error sending quote email via SMTP transporter:', err && err.message);
-      }
-    }
-
+    // Persist quote and respond immediately
     const newQuote = { id: Date.now(), name, email, phone, details };
     quotes.push(newQuote);
     res.status(201).json({ status: 'ok', quote: newQuote });
+
+    // Fire-and-forget: Brevo send (with timeout wrapper)
+    if (process.env.BREVO_API_KEY) {
+      promiseWithTimeout(sendViaBrevo({
+        toEmail: to,
+        subject,
+        htmlContent,
+        senderEmail: process.env.EMAIL_FROM,
+        senderName: 'BDL'
+      }), 10000, 'Brevo send timed out')
+        .then(() => console.log('Quote email sent via Brevo HTTP API'))
+        .catch(err => console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err)));
+    } else {
+      console.warn('BREVO_API_KEY not set; skipping Brevo send.');
+    }
+
+    // Fire-and-forget: SMTP send
+    if (transporter) {
+      transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, text })
+        .then(() => console.log('Quote email sent via SMTP transporter'))
+        .catch(err => console.error('Error sending quote email via SMTP transporter:', err && err.message));
+    }
+
   } catch (err) {
     console.error('Error processing quote request:', err && (err.stack || err.message || err));
-    res.status(500).json({ error: 'Failed to process quote request' });
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to process quote request' });
   }
 });
 
