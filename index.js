@@ -143,7 +143,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
 
-/* --- SMTP connectivity check (auto-logs on startup) --- */
+if (!process.env.SKIP_SMTP_CHECK) { /* --- SMTP connectivity check (auto-logs on startup) --- */
 (function smtpConnectivityCheck() {
   try {
     const host = process.env.SMTP_HOST || 'smtp-relay.sendinblue.com';
@@ -163,4 +163,4 @@ app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`)
   } catch (e) {
     console.error('SMTP connectivity check unexpected error:', e && e.message);
   }
-})();
+})(); } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); }
