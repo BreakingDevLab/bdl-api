@@ -107,27 +107,32 @@ app.post('/api/quote', async (req, res) => {
 
     try {
       if (process.env.BREVO_API_KEY) {
-        await promiseWithTimeout(sendViaBrevo({
-          toEmail: to,
-          subject,
-          htmlContent,
-          senderEmail: process.env.EMAIL_FROM,
-          senderName: 'BDL'
-        }), 10000, 'Brevo send timed out');
-        console.log('Quote email sent via Brevo HTTP API');
-      } else {
-        console.warn('BREVO_API_KEY not set; skipping Brevo send.');
+  // fire-and-forget Brevo send with timeout wrapper
+  promiseWithTimeout(sendViaBrevo({
+    toEmail: to,
+    subject,
+    htmlContent,
+    senderEmail: process.env.EMAIL_FROM,
+    senderName: 'BDL'
+  }), 10000, 'Brevo send timed out')
+    .then(() => console.log('Quote email sent via Brevo HTTP API'))
+    .catch(err => console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err)));
+} else {
+  console.warn('BREVO_API_KEY not set; skipping Brevo send.');
+}
+
       }
     } catch (err) {
       console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err));
-    }
+    
 
-    if (transporter) {
-      try {
-        await transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, text });
-        console.log('Quote email sent via SMTP transporter');
-      } catch (err) {
-        console.error('Error sending quote email via SMTP transporter:', err && err.message);
+   if (transporter) {
+  // fire-and-forget SMTP send
+  transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, text })
+    .then(() => console.log('Quote email sent via SMTP transporter'))
+    .catch(err => console.error('Error sending quote email via SMTP transporter:', err && err.message));
+}
+
       }
     }
 
