@@ -1,4 +1,28 @@
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* Cleaned index.js: single Brevo require, fixed /api/quote handler, timeout wrapper */
 const { sendViaBrevo } = require('./brevo-send');
 const sendQuoteEmailVerbose = require('./verbose-email.js');
@@ -165,3 +189,4 @@ if (!process.env.SKIP_SMTP_CHECK) { if (!process.env.SKIP_SMTP_CHECK) { /* --- S
     console.error('SMTP connectivity check unexpected error:', e && e.message);
   }
 })(); } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); } } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); }
+
