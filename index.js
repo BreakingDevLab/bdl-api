@@ -1,6 +1,5 @@
 /**
  * Merged index.js - single requires, CORS, /api/quote handler, SMTP check
- * Keep this file as the canonical server entry.
  */
 const express = require('express');
 const cors = require('cors');
@@ -16,7 +15,6 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Promise timeout helper
 function promiseWithTimeout(promise, ms, errMsg = 'Operation timed out') {
   let timeout;
   const timeoutPromise = new Promise((_, reject) => {
@@ -25,7 +23,6 @@ function promiseWithTimeout(promise, ms, errMsg = 'Operation timed out') {
   return Promise.race([promise.finally(() => clearTimeout(timeout)), timeoutPromise]);
 }
 
-// CORS: support FRONTEND_ORIGIN (single origin) or CORS_ORIGINS (comma list)
 const frontendOrigin = process.env.FRONTEND_ORIGIN && process.env.FRONTEND_ORIGIN.trim();
 const raw = process.env.CORS_ORIGINS || '';
 const allowedOrigins = raw.split(',').map(s => s.trim()).filter(Boolean);
@@ -33,14 +30,13 @@ if (frontendOrigin) allowedOrigins.push(frontendOrigin);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // allow non-browser tools like curl
-    if (allowedOrigins.length === 0) return callback(null, true); // permissive if none configured
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Not allowed by CORS'));
   }
 }));
 
-// Simple in-memory quotes store (example)
 let quotes = [
   { id: 1, text: "The only limit to our realization of tomorrow is our doubts of today.", author: "F. D. Roosevelt" },
   { id: 2, text: "Do not wait to strike till the iron is hot; but make it hot by striking.", author: "William Butler Yeats" }
@@ -55,7 +51,6 @@ app.get('/api/quotes/:id', (req, res) => {
   res.json(q);
 });
 
-// Helper to create SMTP transporter if env vars present
 function createTransporter() {
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
@@ -68,7 +63,6 @@ function createTransporter() {
   return nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
 }
 
-// POST /api/quote - respond immediately, then send emails in background
 app.post('/api/quote', async (req, res) => {
   try {
     const { name, email, phone, details } = req.body || {};
@@ -91,12 +85,10 @@ app.post('/api/quote', async (req, res) => {
       <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
       <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
 
-    // Persist quote and respond immediately
     const newQuote = { id: Date.now(), name, email, phone, details };
     quotes.push(newQuote);
     res.status(201).json({ status: 'ok', quote: newQuote });
 
-    // Fire-and-forget: Brevo HTTP API (if configured)
     if (process.env.BREVO_API_KEY) {
       promiseWithTimeout(sendViaBrevo({
         toEmail: to,
@@ -111,7 +103,6 @@ app.post('/api/quote', async (req, res) => {
       console.warn('BREVO_API_KEY not set; skipping Brevo send.');
     }
 
-    // Fire-and-forget: SMTP send (if transporter available)
     const transporter = createTransporter();
     if (transporter) {
       transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, text })
@@ -125,7 +116,6 @@ app.post('/api/quote', async (req, res) => {
   }
 });
 
-// SMTP connectivity check (runs on startup unless SKIP_SMTP_CHECK=1)
 if (!process.env.SKIP_SMTP_CHECK) {
   (function smtpConnectivityCheck() {
     try {
@@ -154,28 +144,3 @@ if (!process.env.SKIP_SMTP_CHECK) {
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
-<<<<<<< HEAD
-=======
-
-if (!process.env.SKIP_SMTP_CHECK) { if (!process.env.SKIP_SMTP_CHECK) { /* --- SMTP connectivity check (auto-logs on startup) --- */
-(function smtpConnectivityCheck() {
-  try {
-    const host = process.env.SMTP_HOST || 'smtp-relay.sendinblue.com';
-    const port = Number(process.env.SMTP_PORT) || 587;
-    console.log('SMTP connectivity check: resolving', host);
-    dns.lookup(host, { all: true }, (err, addresses) => {
-      if (err) { console.error('SMTP DNS lookup failed:', err && err.message); return; }
-      console.log('SMTP DNS addresses:', addresses.map(a => a.address).join(', '));
-      const socket = new net.Socket();
-      let connected = false;
-      socket.setTimeout(10000);
-      socket.on('connect', () => { connected = true; console.log(`SMTP TCP connect OK to ${host}:${port}`); socket.end(); });
-      socket.on('timeout', () => { console.error(`SMTP TCP connect timed out to ${host}:${port}`); socket.destroy(); });
-      socket.on('error', (e) => { if (!connected) console.error(`SMTP TCP connect error to ${host}:${port}:`, e && e.message); });
-      socket.connect(port, host);
-    });
-  } catch (e) {
-    console.error('SMTP connectivity check unexpected error:', e && e.message);
-  }
-})(); } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); } } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); }
->>>>>>> c8f7ff9 (Debug: honor SKIP_SMTP_CHECK to skip SMTP connectivity probe)
