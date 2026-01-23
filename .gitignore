@@ -7,3 +7,5 @@ node_modules/
 send-test.js
 /*.backup
 /index.js.pre-*
+index.js.bak*
+index.js.tmp
