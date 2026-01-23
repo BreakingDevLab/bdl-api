@@ -1,15 +1,6 @@
 /**
- * brevo-send.js
- * Guarded Brevo HTTP send with timeout
+ * brevo-send.js - lazy require and 10s timeout for Brevo HTTP sends
  */
-let SibApiV3Sdk = null;
-try {
-  SibApiV3Sdk = require('@sendinblue/client');
-} catch (err) {
-  console.warn('@sendinblue/client require failed at startup:', err && err.message);
-  SibApiV3Sdk = null;
-}
-
 function promiseWithTimeout(promise, ms, errorMessage = 'Operation timed out') {
   let timeout;
   const timeoutPromise = new Promise((_, reject) => {
@@ -19,8 +10,17 @@ function promiseWithTimeout(promise, ms, errorMessage = 'Operation timed out') {
 }
 
 module.exports = async function sendBrevoEmail(payload) {
-  if (!SibApiV3Sdk || !process.env.BREVO_API_KEY) {
+  let SibApiV3Sdk;
+  try {
+    // lazy require so missing module doesn't break startup
+    SibApiV3Sdk = require('@sendinblue/client');
+  } catch (err) {
     console.warn('Brevo HTTP client not available. Skipping Brevo send.');
+    return;
+  }
+
+  if (!process.env.BREVO_API_KEY) {
+    console.warn('BREVO_API_KEY not set. Skipping Brevo send.');
     return;
   }
 
@@ -36,7 +36,6 @@ module.exports = async function sendBrevoEmail(payload) {
       htmlContent: payload.html || payload.text
     };
 
-    // enforce a 10s timeout on the HTTP send so it cannot hang the request
     await promiseWithTimeout(apiInstance.sendTransacEmail(sendSmtpEmail), 10000, 'Brevo HTTP send timed out');
     console.log('Quote email sent via Brevo HTTP API');
   } catch (err) {
