@@ -1,3 +1,4 @@
+
 /* Cleaned index.js: single Brevo require, fixed /api/quote handler, timeout wrapper */
 const { sendViaBrevo } = require('./brevo-send');
 const sendQuoteEmailVerbose = require('./verbose-email.js');
