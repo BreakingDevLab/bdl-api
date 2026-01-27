@@ -41,7 +41,6 @@ function promiseWithTimeout(promise, ms, errMsg = 'Operation timed out') {
   let timeout;
   const timeoutPromise = new Promise((_, reject) => {
     timeout = setTimeout(() => reject(new Error(errMsg)), ms);
-    } catch (err) { console.error('Quote handler error:', err && err.message); try { if (!res.headersSent) res.status(500).json({ error: 'internal' }); } catch(e){} }
   });
   return Promise.race([promise.finally(() => clearTimeout(timeout)), timeoutPromise]);
 }
@@ -162,7 +161,8 @@ app.post('/api/quote', async (req, res) => {
         console.error('Error sending quote email via SMTP transporter:', err && err.message);
       }
     }
-});
+    } catch (err) { console.error('Quote handler error:', err && err.message); try { if (!res.headersSent) res.status(500).json({ error: 'internal' }); } catch(e){} }
+  });
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
