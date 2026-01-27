@@ -3,7 +3,8 @@
  */
 const express = require('express');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
+// 
+const { sendEmail } = require('./email-adapter');
 const dns = require('dns');
 const net = require('net');
 
