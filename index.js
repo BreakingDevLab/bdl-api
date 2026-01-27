@@ -187,3 +187,7 @@ if (!process.env.SKIP_SMTP_CHECK) { if (!process.env.SKIP_SMTP_CHECK) { /* --- S
   }
 })(); } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); } } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); }
 
+
+})();
+}
+}
