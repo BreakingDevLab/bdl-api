@@ -1,6 +1,31 @@
-/**
- * Merged index.js - single requires, CORS, /api/quote handler, SMTP check
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Cleaned index.js: single Brevo require, fixed /api/quote handler, timeout wrapper */
+const { sendViaBrevo } = require('./brevo-send');
+const sendQuoteEmailVerbose = require('./verbose-email.js');
 const express = require('express');
 const cors = require('cors');
 // 
@@ -8,14 +33,10 @@ const { sendEmail } = require('./email-adapter');
 const dns = require('dns');
 const net = require('net');
 
-const { sendViaBrevo } = require('./brevo-send');
-const { sendViaBrevoHttp } = require('./sendEmail');
-const sendQuoteEmailVerbose = require('./verbose-email.js');
-
 const app = express();
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
+// Promise timeout helper
 function promiseWithTimeout(promise, ms, errMsg = 'Operation timed out') {
   let timeout;
   const timeoutPromise = new Promise((_, reject) => {
@@ -24,17 +45,14 @@ function promiseWithTimeout(promise, ms, errMsg = 'Operation timed out') {
   return Promise.race([promise.finally(() => clearTimeout(timeout)), timeoutPromise]);
 }
 
-const frontendOrigin = process.env.FRONTEND_ORIGIN && process.env.FRONTEND_ORIGIN.trim();
+// CORS
 const raw = process.env.CORS_ORIGINS || '';
 const allowedOrigins = raw.split(',').map(s => s.trim()).filter(Boolean);
-if (frontendOrigin) allowedOrigins.push(frontendOrigin);
-
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.length === 0) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(null, false);
+    return callback(new Error('Not allowed by CORS'));
   }
 }));
 
@@ -51,6 +69,28 @@ app.get('/api/quotes/:id', (req, res) => {
   if (!q) return res.status(404).json({ error: 'Quote not found' });
   res.json(q);
 });
+app.post('/api/quotes', (req, res) => {
+  const { text, author } = req.body;
+  if (!text) return res.status(400).json({ error: 'text is required' });
+  const newQuote = { id: Date.now(), text, author: author || 'Unknown' };
+  quotes.push(newQuote);
+  res.status(201).json(newQuote);
+});
+app.put('/api/quotes/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const idx = quotes.findIndex(x => x.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Quote not found' });
+  const { text, author } = req.body;
+  quotes[idx] = { ...quotes[idx], text: text || quotes[idx].text, author: author || quotes[idx].author };
+  res.json(quotes[idx]);
+});
+app.delete('/api/quotes/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const before = quotes.length;
+  quotes = quotes.filter(x => x.id !== id);
+  if (quotes.length === before) return res.status(404).json({ error: 'Quote not found' });
+  res.status(204).send();
+});
 
 function createTransporter() {
   const host = process.env.SMTP_HOST;
@@ -63,6 +103,8 @@ function createTransporter() {
   }
   return nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
 }
+
+app.use(express.urlencoded({ extended: true }));
 
 app.post('/api/quote', async (req, res) => {
   try {
@@ -81,22 +123,28 @@ app.post('/api/quote', async (req, res) => {
 
     const subject = `New quote request from ${name}`;
     const htmlContent = `<h3>New quote request</h3>
-      <p><strong>Name:</strong> ${name}</p>
-      <p><strong>Email:</strong> ${email || 'N/A'}</p>
-      <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
-      <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
+  <p><strong>Name:</strong> ${name}</p>
+  <p><strong>Email:</strong> ${email || 'N/A'}</p>
+  <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
+  <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
 
+    // Build transporter (may be null) but do not block the response on it
+    const transporter = createTransporter();
+    if (!transporter) console.warn('No SMTP transporter configured; will still attempt Brevo if BREVO_API_KEY is set.');
+
+    // Persist quote and respond immediately
     const newQuote = { id: Date.now(), name, email, phone, details };
     quotes.push(newQuote);
     res.status(201).json({ status: 'ok', quote: newQuote });
 
+    // Fire-and-forget: Brevo send (with timeout wrapper)
     if (process.env.BREVO_API_KEY) {
       promiseWithTimeout(sendViaBrevo({
         toEmail: to,
         subject,
         htmlContent,
         senderEmail: process.env.EMAIL_FROM,
-        senderName: process.env.SENDER_NAME || 'BDL'
+        senderName: 'BDL'
       }), 10000, 'Brevo send timed out')
         .then(() => console.log('Quote email sent via Brevo HTTP API'))
         .catch(err => console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err)));
@@ -104,7 +152,7 @@ app.post('/api/quote', async (req, res) => {
       console.warn('BREVO_API_KEY not set; skipping Brevo send.');
     }
 
-    const transporter = createTransporter();
+    // Fire-and-forget: SMTP send
     if (transporter) {
       try {
         await sendEmail({ to, subject, text, html });
@@ -113,11 +161,13 @@ app.post('/api/quote', async (req, res) => {
         console.error('Error sending quote email via SMTP transporter:', err && err.message);
       }
     }
-<<<<<<< HEAD
-  }
 });
+const HOST = process.env.HOST || '0.0.0.0';
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
 
 if (!process.env.SKIP_SMTP_CHECK) {
+  /* --- SMTP connectivity check (auto-logs on startup) --- */
   (function smtpConnectivityCheck() {
     try {
       const host = process.env.SMTP_HOST || 'smtp-relay.sendinblue.com';
@@ -141,46 +191,3 @@ if (!process.env.SKIP_SMTP_CHECK) {
 } else {
   console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1');
 }
-
-=======
->>>>>>> 6133b5f (Fix: remove duplicated handler closing lines causing syntax error in index.js)
-const HOST = process.env.HOST || '0.0.0.0';
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
-<<<<<<< HEAD
-=======
-
-if (!process.env.SKIP_SMTP_CHECK) { if (!process.env.SKIP_SMTP_CHECK) { /* --- SMTP connectivity check (auto-logs on startup) --- */
-(function smtpConnectivityCheck() {
-  try {
-    const host = process.env.SMTP_HOST || 'smtp-relay.sendinblue.com';
-    const port = Number(process.env.SMTP_PORT) || 587;
-    console.log('SMTP connectivity check: resolving', host);
-    dns.lookup(host, { all: true }, (err, addresses) => {
-      if (err) { console.error('SMTP DNS lookup failed:', err && err.message); return; }
-      console.log('SMTP DNS addresses:', addresses.map(a => a.address).join(', '));
-      const socket = new net.Socket();
-      let connected = false;
-      socket.setTimeout(10000);
-      socket.on('connect', () => { connected = true; console.log(`SMTP TCP connect OK to ${host}:${port}`); socket.end(); });
-      socket.on('timeout', () => { console.error(`SMTP TCP connect timed out to ${host}:${port}`); socket.destroy(); });
-      socket.on('error', (e) => { if (!connected) console.error(`SMTP TCP connect error to ${host}:${port}:`, e && e.message); });
-      socket.connect(port, host);
-    });
-  } catch (e) {
-    console.error('SMTP connectivity check unexpected error:', e && e.message);
-  }
-})(); } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); } } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); }
-
-
-})();
-}
-
-
->>>>>>> 3ad2999 (Fix: close smtpConnectivityCheck IIFE and surrounding if blocks to resolve EOF syntax error)
-
-save
-Insert
-
-
-
