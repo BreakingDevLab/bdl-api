@@ -13,7 +13,7 @@ module.exports = async function sendQuoteEmailVerbose(transporter, payload, res)
       userSet: !!process.env.SMTP_USER,
     });
 
-    const info = await transporter.sendMail({ from, to, subject, text });
+    const info = await sendEmail({ to, subject, text, html });
     console.log('Email sent', { to, messageId: info.messageId, response: info.response });
     res.status(201).json({ status: 'ok', message: 'Quote request received and emailed.' });
   } catch (err) {
