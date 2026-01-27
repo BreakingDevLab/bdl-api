@@ -1,22 +1,52 @@
 /*
   brevo-http-send.js
-  Minimal Brevo HTTP send helper. Reads BREVO_API_KEY from env.
+  sendViaBrevo({ to, subject, text, htmlContent, htmlUrl })
+  - If htmlContent is empty and htmlUrl provided, fetch htmlUrl
+  - Normalizes to into [{ email }]
 */
-async function sendViaBrevo({ to, subject, text }) {
-  const apiKey = process.env.BREVO_API_KEY;
-  if (!apiKey) throw new Error('BREVO_API_KEY not set');
+async function sendViaBrevo({ to, subject, text, htmlContent, htmlUrl }) {
+  if (!process.env.BREVO_API_KEY) throw new Error('BREVO_API_KEY not set');
+
+  const effectiveTo = to || process.env.EMAIL_TO;
+  if (!effectiveTo) throw new Error('sendViaBrevo: missing "to" and EMAIL_TO not set');
+
+  const toList = Array.isArray(effectiveTo)
+    ? effectiveTo.map(t => (typeof t === 'string' ? { email: t } : t))
+    : [{ email: effectiveTo }];
+
+  let bodyHtml = (htmlContent && String(htmlContent).trim()) || (text && String(text).trim()) || '';
+
+  if (!bodyHtml && htmlUrl) {
+    try {
+      const r = await fetch(htmlUrl, { method: 'GET' });
+      if (r.ok) bodyHtml = await r.text();
+      else console.warn('sendViaBrevo: fetch htmlUrl returned', r.status);
+    } catch (err) {
+      console.warn('sendViaBrevo: failed to fetch htmlUrl', err && err.message);
+    }
+  }
+
+  if (!bodyHtml) bodyHtml = '<div>(no message body)</div>';
+
+  const payload = {
+    sender: { email: process.env.EMAIL_FROM || '' },
+    to: toList,
+    subject: subject || '',
+    htmlContent: bodyHtml
+  };
+
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'api-key': apiKey },
-    body: JSON.stringify({
-      sender: { name: 'BDL', email: 'a02174001@smtp-brevo.com' },
-      to: [{ email: to }],
-      subject,
-      textContent: text
-    })
+    headers: { 'Content-Type': 'application/json', 'api-key': process.env.BREVO_API_KEY },
+    body: JSON.stringify(payload)
   });
-  const body = await res.json().catch(() => null);
-  if (!res.ok) throw Object.assign(new Error('Brevo API error'), { status: res.status, body });
-  return body;
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data.message || JSON.stringify(data);
+    throw new Error(`Brevo error: ${msg}`);
+  }
+  return data;
 }
+
 module.exports = { sendViaBrevo };
