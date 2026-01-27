@@ -161,6 +161,7 @@ app.post('/api/quote', async (req, res) => {
         console.error('Error sending quote email via SMTP transporter:', err && err.message);
       }
     }
+});
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
