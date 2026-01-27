@@ -154,14 +154,13 @@ app.post('/api/quote', async (req, res) => {
 
     // Fire-and-forget: SMTP send
     if (transporter) {
-      transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, text })
-        .then(() => console.log('Quote email sent via SMTP transporter'))
-        .catch(err => console.error('Error sending quote email via SMTP transporter:', err && err.message));
+      try {
+        await sendEmail({ to, subject, text, html });
+        console.log('Quote email sent via SMTP transporter');
+      } catch (err) {
+        console.error('Error sending quote email via SMTP transporter:', err && err.message);
+      }
     }
-
-  } catch (err) {
-    console.error('Error processing quote request:', err && (err.stack || err.message || err));
-    if (!res.headersSent) res.status(500).json({ error: 'Failed to process quote request' });
   }
 });
 
