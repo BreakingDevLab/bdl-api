@@ -147,3 +147,40 @@ if (!process.env.SKIP_SMTP_CHECK) {
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
+<<<<<<< HEAD
+=======
+
+if (!process.env.SKIP_SMTP_CHECK) { if (!process.env.SKIP_SMTP_CHECK) { /* --- SMTP connectivity check (auto-logs on startup) --- */
+(function smtpConnectivityCheck() {
+  try {
+    const host = process.env.SMTP_HOST || 'smtp-relay.sendinblue.com';
+    const port = Number(process.env.SMTP_PORT) || 587;
+    console.log('SMTP connectivity check: resolving', host);
+    dns.lookup(host, { all: true }, (err, addresses) => {
+      if (err) { console.error('SMTP DNS lookup failed:', err && err.message); return; }
+      console.log('SMTP DNS addresses:', addresses.map(a => a.address).join(', '));
+      const socket = new net.Socket();
+      let connected = false;
+      socket.setTimeout(10000);
+      socket.on('connect', () => { connected = true; console.log(`SMTP TCP connect OK to ${host}:${port}`); socket.end(); });
+      socket.on('timeout', () => { console.error(`SMTP TCP connect timed out to ${host}:${port}`); socket.destroy(); });
+      socket.on('error', (e) => { if (!connected) console.error(`SMTP TCP connect error to ${host}:${port}:`, e && e.message); });
+      socket.connect(port, host);
+    });
+  } catch (e) {
+    console.error('SMTP connectivity check unexpected error:', e && e.message);
+  }
+})(); } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); } } else { console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1'); }
+
+
+})();
+}
+
+
+>>>>>>> 3ad2999 (Fix: close smtpConnectivityCheck IIFE and surrounding if blocks to resolve EOF syntax error)
+
+save
+Insert
+
+
+
