@@ -41,6 +41,7 @@ function promiseWithTimeout(promise, ms, errMsg = 'Operation timed out') {
   let timeout;
   const timeoutPromise = new Promise((_, reject) => {
     timeout = setTimeout(() => reject(new Error(errMsg)), ms);
+    } catch (err) { console.error('Quote handler error:', err && err.message); try { if (!res.headersSent) res.status(500).json({ error: 'internal' }); } catch(e){} }
   });
   return Promise.race([promise.finally(() => clearTimeout(timeout)), timeoutPromise]);
 }
