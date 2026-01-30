@@ -1,3 +1,4 @@
+
 const nodemailer = require('nodemailer');
 
 
@@ -194,3 +195,4 @@ if (!process.env.SKIP_SMTP_CHECK) {
 } else {
   console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1');
 }
+
