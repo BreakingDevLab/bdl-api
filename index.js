@@ -1,3 +1,4 @@
+const nodemailer = require('nodemailer');
 
 
 
@@ -155,7 +156,8 @@ app.post('/api/quote', async (req, res) => {
     // Fire-and-forget: SMTP send
     if (transporter) {
       try {
-        await sendEmail({ to, subject, text, html });
+        const htmlBody = (typeof html !== 'undefined') ? html : (typeof htmlContent !== 'undefined' ? htmlContent : '');
+await sendEmail({ to, subject, text, html: htmlBody });
         console.log('Quote email sent via SMTP transporter');
       } catch (err) {
         console.error('Error sending quote email via SMTP transporter:', err && err.message);
