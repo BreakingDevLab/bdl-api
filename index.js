@@ -3,7 +3,7 @@
  */
 const express = require('express');
 const cors = require('cors');
-// 
+const nodemailer = require('nodemailer');
 const { sendEmail } = require('./email-adapter');
 const dns = require('dns');
 const net = require('net');
@@ -77,14 +77,14 @@ app.post('/api/quote', async (req, res) => {
       '',
       'Request details:',
       details
-    ].join('\n');
+    ].join('\\n');
 
     const subject = `New quote request from ${name}`;
     const htmlContent = `<h3>New quote request</h3>
       <p><strong>Name:</strong> ${name}</p>
       <p><strong>Email:</strong> ${email || 'N/A'}</p>
       <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
-      <h4>Details</h4><p>${(details || '').replace(/\n/g, '<br>')}</p>`;
+      <h4>Details</h4><p>${(details || '').replace(/\\n/g, '<br>')}</p>`;
 
     const newQuote = { id: Date.now(), name, email, phone, details };
     quotes.push(newQuote);
@@ -107,13 +107,15 @@ app.post('/api/quote', async (req, res) => {
     const transporter = createTransporter();
     if (transporter) {
       try {
-        await sendEmail({ to, subject, text, html });
+        await sendEmail({ to, subject, text, html: htmlContent });
         console.log('Quote email sent via SMTP transporter');
       } catch (err) {
         console.error('Error sending quote email via SMTP transporter:', err && err.message);
       }
     }
-<<<<<<< HEAD
+  } catch (err) {
+    console.error('Unhandled error in /api/quote:', err && err.message);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -142,8 +144,6 @@ if (!process.env.SKIP_SMTP_CHECK) {
   console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1');
 }
 
-=======
->>>>>>> 6133b5f (Fix: remove duplicated handler closing lines causing syntax error in index.js)
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
