@@ -147,3 +147,4 @@ if (!process.env.SKIP_SMTP_CHECK) {
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
+
