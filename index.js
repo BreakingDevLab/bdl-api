@@ -113,7 +113,6 @@ app.post('/api/quote', async (req, res) => {
         console.error('Error sending quote email via SMTP transporter:', err && err.message);
       }
     }
-<<<<<<< HEAD
   }
 });
 
@@ -142,8 +141,6 @@ if (!process.env.SKIP_SMTP_CHECK) {
   console.log('Skipping SMTP connectivity check due to SKIP_SMTP_CHECK=1');
 }
 
-=======
->>>>>>> 6133b5f (Fix: remove duplicated handler closing lines causing syntax error in index.js)
 const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
