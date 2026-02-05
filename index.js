@@ -81,3 +81,78 @@ const HOST = process.env.HOST || '0.0.0.0';
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, HOST, () => console.log(`BDL API listening on ${HOST}:${PORT}`));
 
+/**
+ * Temporary test route to verify /api/quote exists and verbose-email builds payload.
+ * Remove this after you restore the original route.
+ */
+app.post('/api/quote', async (req, res) => {
+  try {
+    const { name, email, phone, details } = req.body || {};
+    const senderName = process.env.SENDER_NAME || 'BDL';
+    const senderEmail = process.env.EMAIL_FROM || 'no-reply@example.com';
+
+    // verbose-email exports a default sendQuote function and buildQuoteEmail
+    const sendQuote = require('./verbose-email.js');
+    const result = await sendQuote({
+      to: process.env.EMAIL_FROM || 'you@example.com',
+      name, email, phone, details, senderName, senderEmail
+    });
+
+    // Return the built payload and send result for inspection
+    return res.status(201).json({ ok: true, result });
+  } catch (err) {
+    console.error('Quote route error', err);
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+/**
+ * Production /api/quote route
+ * Prefers Brevo HTTP when BREVO_API_KEY is present, falls back to verbose-email (safeSendMail).
+ */
+app.post('/api/quote', async (req, res) => {
+  try {
+    const { name, email, phone, details } = req.body || {};
+    const senderName = process.env.SENDER_NAME || 'BDL';
+    const senderEmail = process.env.EMAIL_FROM || 'no-reply@example.com';
+    const to = process.env.EMAIL_FROM || 'you@example.com';
+
+    // Build payload using verbose-email helper
+    const sendQuote = require('./verbose-email.js');
+    const built = await sendQuote.buildQuoteEmail
+      ? sendQuote.buildQuoteEmail({ name, email, phone, details, senderName, senderEmail })
+      : (await sendQuote({ to, name, email, phone, details, senderName, senderEmail })).payload;
+
+    // Prefer Brevo HTTP
+    if (process.env.BREVO_API_KEY) {
+      const { sendViaBrevoHttp } = require('./sendEmail');
+      try {
+        const result = await sendViaBrevoHttp({
+          to,
+          subject: built.subject,
+          text: built.text,
+          html: built.html,
+          senderName,
+          senderEmail
+        });
+        return res.status(201).json({ ok: true, via: 'brevo', result });
+      } catch (err) {
+        console.error('Brevo send error', err && (err.body || err.message || err));
+        // fall through to SMTP fallback if available
+      }
+    }
+
+    // SMTP / safeSendMail fallback
+    const sendResult = await require('./verbose-email.js')({
+      to,
+      name, email, phone, details, senderName, senderEmail
+    });
+
+    return res.status(201).json({ ok: !!sendResult.ok, via: 'smtp', result: sendResult });
+  } catch (err) {
+    console.error('Quote route error', err);
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', brevo: !!process.env.BREVO_API_KEY });
+});
