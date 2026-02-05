@@ -11,6 +11,7 @@ const net = require('net');
 const { sendViaBrevo } = require('./brevo-send');
 const { sendViaBrevoHttp } = require('./sendEmail');
 const sendQuoteEmailVerbose = require('./verbose-email.js');
+const { safeSendMail } = require(\x27./safe-mail\x27);
 
 const app = express();
 app.use(express.json());
