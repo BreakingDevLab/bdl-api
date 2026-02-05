@@ -107,7 +107,7 @@ app.post('/api/quote', async (req, res) => {
 
     const transporter = createTransporter();
     if (transporter) {
-      try {
+      
 try {
   const _mailRes = await safeSendMail({ to, subject, text, html });
   if (!_mailRes.ok) {
