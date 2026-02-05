@@ -122,16 +122,7 @@ app.post('/api/quote', async (req, res) => {
 });
 
       
-try {
-  const _mailRes = await safeSendMail({ to, subject, text, html });
-  if (!_mailRes.ok) {
-    console.warn('Mail not sent:', _mailRes.reason);
-  } else {
-    console.log('Mail sent via', _mailRes.via || 'unknown');
-  }
-} catch (e) {
-  console.error('safeSendMail unexpected error:', e && (e.message || e));
-}
+
 
       } catch (err) {
         console.error('Error sending quote email via SMTP transporter:', err && err.message);
