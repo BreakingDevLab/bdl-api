@@ -156,3 +156,45 @@ app.post('/api/quote', async (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', brevo: !!process.env.BREVO_API_KEY });
 });
+
+// POST /api/lead — reuse the same logic as /api/quote
+app.post('/api/lead', async (req, res) => {
+  try {
+    const { name, email, phone, details } = req.body || {};
+    const senderName = process.env.SENDER_NAME || 'BDL';
+    const senderEmail = process.env.EMAIL_FROM || 'no-reply@example.com';
+    const to = process.env.EMAIL_FROM || 'you@example.com';
+
+    const sendQuote = require('./verbose-email.js');
+    const built = await sendQuote.buildQuoteEmail
+      ? sendQuote.buildQuoteEmail({ name, email, phone, details, senderName, senderEmail })
+      : (await sendQuote({ to, name, email, phone, details, senderName, senderEmail })).payload;
+
+    if (process.env.BREVO_API_KEY) {
+      const { trySendEmail } = require('./sendEmail');
+      try {
+        const result = await trySendEmail({
+          to,
+          subject: built.subject,
+          text: built.text,
+          html: built.html,
+          senderName,
+          senderEmail
+        });
+        return res.status(201).json({ ok: true, via: 'brevo', result });
+      } catch (err) {
+        console.error('Brevo send error (lead)', err && (err.body || err.message || err));
+      }
+    }
+
+    const sendResult = await require('./verbose-email.js')({
+      to,
+      name, email, phone, details, senderName, senderEmail
+    });
+
+    return res.status(201).json({ ok: !!sendResult.ok, via: 'smtp', result: sendResult });
+  } catch (err) {
+    console.error('Lead route error', err);
+    return res.status(500).json({ ok: false, error: String(err) });
+  }
+});

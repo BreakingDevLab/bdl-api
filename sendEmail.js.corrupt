@@ -69,7 +69,7 @@ async function tryBrevoWithRetry(payload, attempts = 3) {
       return await sendViaBrevoHttp(payload);
     } catch (err) {
       const transient = isTransientBrevoError(err);
-      console.error(`Brevo attempt ${i+1} failed`, err && (err.status || err.message));
+      console.error(\`Brevo attempt \${i+1} failed\`, err && (err.status || err.message));
       if (!transient) throw err;
       if (i < attempts - 1) await new Promise(r => setTimeout(r, delay));
       delay *= 2;
@@ -87,19 +87,19 @@ async function tryBrevoWithRetry(payload, attempts = 3) {
  */
 async function trySendEmail(payload) {
   const { to, name, email, phone, details, senderName, senderEmail } = payload;
-  const subject = payload.subject || `New quote request from ${name || 'Unknown'}`;
+  const subject = payload.subject || \`New quote request from \${name || 'Unknown'}\`;
   const text = payload.text || [
-    `Name: ${name || 'N/A'}`,
-    `Email: ${email || 'N/A'}`,
-    `Phone: ${phone || 'N/A'}`,
+    \`Name: \${name || 'N/A'}\`,
+    \`Email: \${email || 'N/A'}\`,
+    \`Phone: \${phone || 'N/A'}\`,
     '',
     details || ''
-  ].join('\n');
-  const html = payload.html || `<h3>New quote request</h3>
-    <p><strong>Name:</strong> ${name || 'N/A'}</p>
-    <p><strong>Email:</strong> ${email || 'N/A'}</p>
-    <p><strong>Phone:</strong> ${phone || 'N/A'}</p>
-    <h4>Details</h4><p>${(details || '').replace(/\n/g,'<br>')}</p>`;
+  ].join('\\n');
+  const html = payload.html || \`<h3>New quote request</h3>
+    <p><strong>Name:</strong> \${name || 'N/A'}</p>
+    <p><strong>Email:</strong> \${email || 'N/A'}</p>
+    <p><strong>Phone:</strong> \${phone || 'N/A'}</p>
+    <h4>Details</h4><p>\${(details || '').replace(/\\n/g,'<br>')}</p>\`;
 
   const brevoPayload = { to: to || process.env.EMAIL_FROM, subject, text, html, senderName, senderEmail };
 

@@ -3,7 +3,7 @@
   Tries Brevo HTTP first (if BREVO_API_KEY), falls back to SMTP sendEmail adapter.
   Returns { ok: true } on success, { ok: false, reason } on failure.
 */
-const { sendViaBrevoHttp } = require('./sendEmail'); // existing Brevo HTTP helper
+const { trySendEmail } = require('./sendEmail'); // existing Brevo HTTP helper
 const { sendEmail } = require('./email-adapter');    // existing SMTP adapter
 
 function withTimeout(promise, ms, errMsg = 'Operation timed out') {
@@ -19,7 +19,7 @@ async function safeSendMail({ to, subject, text, html }) {
   if (process.env.BREVO_API_KEY) {
     try {
       // sendViaBrevoHttp expects an object; adapt if your implementation differs
-      await withTimeout(sendViaBrevoHttp({
+      await withTimeout(trySendEmail({
         toEmail: to,
         subject,
         htmlContent: html,
