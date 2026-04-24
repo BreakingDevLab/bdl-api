@@ -90,18 +90,8 @@ app.post('/api/quote', async (req, res) => {
     quotes.push(newQuote);
     res.status(201).json({ status: 'ok', quote: newQuote });
 
-    if (process.env.BREVO_API_KEY) {
-      promiseWithTimeout(sendViaBrevo({
-        to: to,
-        subject: subject,
-        text: text,
-        html: htmlContent
-      }), 10000, 'Brevo send timed out')
-        .then(() => console.log('Quote email sent via Brevo HTTP API'))
-        .catch(err => console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err)));
-    } else {
-      console.warn('BREVO_API_KEY not set; skipping Brevo send.');
-    }
+    // Brevo HTTP send disabled by patch
+
 
     const transporter = createTransporter();
     if (transporter) {
