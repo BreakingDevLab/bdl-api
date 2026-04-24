@@ -9,7 +9,7 @@ const dns = require('dns');
 const net = require('net');
 
 const sendViaBrevo = require('./sendViaBrevo');
-const { sendViaBrevoHttp } = require('./sendEmail');
+
 const sendQuoteEmailVerbose = require('./verbose-email.js');
 
 const app = express();
@@ -106,7 +106,7 @@ app.post('/api/quote', async (req, res) => {
     const transporter = createTransporter();
     if (transporter) {
       try {
-        await sendEmail({ to, subject, text, html: htmlContent });
+        sendEmail({}).then(() => console.log('Quote email sent via SMTP transporter')).catch(err => console.error('Error sending quote email via SMTP transporter:', err && err.message));
         console.log('Quote email sent via SMTP transporter');
       } catch (err) {
         console.error('Error sending quote email via SMTP transporter:', err && err.message);
