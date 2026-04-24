@@ -8,7 +8,7 @@ const { sendEmail } = require('./email-adapter');
 const dns = require('dns');
 const net = require('net');
 
-const { sendViaBrevo } = require('./brevo-send');
+const sendViaBrevo = require('./sendViaBrevo');
 const { sendViaBrevoHttp } = require('./sendEmail');
 const sendQuoteEmailVerbose = require('./verbose-email.js');
 
@@ -92,11 +92,10 @@ app.post('/api/quote', async (req, res) => {
 
     if (process.env.BREVO_API_KEY) {
       promiseWithTimeout(sendViaBrevo({
-        toEmail: to,
-        subject,
-        htmlContent,
-        senderEmail: process.env.EMAIL_FROM,
-        senderName: process.env.SENDER_NAME || 'BDL'
+        to: to,
+        subject: subject,
+        text: text,
+        html: htmlContent
       }), 10000, 'Brevo send timed out')
         .then(() => console.log('Quote email sent via Brevo HTTP API'))
         .catch(err => console.error('Error sending quote email via Brevo:', err && (err.body || err.message || err)));
