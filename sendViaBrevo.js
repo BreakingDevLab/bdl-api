@@ -3,12 +3,15 @@ const nodemailer = require('nodemailer');
 async function sendViaBrevo({ to, subject, text, html }) {
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
-    port: process.env.SMTP_PORT || 587,
-    secure: false,
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_PORT === '465',
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    tls: {
+      rejectUnauthorized: false
+    }
   });
 
   const info = await transporter.sendMail({
